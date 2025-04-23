@@ -28,7 +28,7 @@ for n in nets:
     # 1) Upsert record (match on external_id), payload under data.values
     put = requests.put(
         f"{ATTIO_BASE}/objects/{os.environ['ATTIO_OBJ']}/records",
-        params={"matching_attribute": "external_id"},
+        params={"matching_attribute": "record_id"},
         json={"data": {"values": values}},
         headers=HEADERS
     )
