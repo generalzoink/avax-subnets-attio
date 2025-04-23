@@ -21,8 +21,8 @@ for n in nets:
         "external_id": str(n["chainId"]),
         "name":        n.get("chainName"),
         "chain_id_6":    n.get("chainId"),
-        "RPC":         n.get("rpcUrl"),
-        "Status":      "Mainnet" if n.get("isMainnet") else "Testnet",
+        "rpc":         n.get("rpcUrl"),
+        "status":      "Mainnet" if n.get("isMainnet") else "Testnet",
     }
 
     # 1) Upsert record (match on external_id), payload under data.values
