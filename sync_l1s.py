@@ -1,25 +1,13 @@
-import os, requests, time, json
+import os, requests, time
 
 ATTIO = "https://api.attio.com/v2"
 HEAD  = {"Authorization": f"Bearer {os.environ['ATTIO_TOKEN']}"}
 
-# 1) fetch & debug-dump
-resp = requests.get("https://glacier-api.avax.network/v1/networks")
+# fetch all supported Avalanche chains
+resp = requests.get("https://glacier-api.avax.network/v1/chains")
 resp.raise_for_status()
 payload = resp.json()
-print("⛰ Glacier payload:", json.dumps(payload, indent=2))
-
-# 2) pick the right key
-if isinstance(payload, dict):
-    if   "items"    in payload: nets = payload["items"]
-    elif "networks" in payload: nets = payload["networks"]
-    elif "data"     in payload: nets = payload["data"]
-    else:
-        raise RuntimeError(f"Unexpected keys: {list(payload)}")
-elif isinstance(payload, list):
-    nets = payload
-else:
-    raise RuntimeError(f"Unexpected type: {type(payload)}")
+nets    = payload["items"]
 
 # 3) loop over nets
 for n in nets:
