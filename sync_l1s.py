@@ -7,7 +7,7 @@ HEAD  = {"Authorization": f"Bearer {os.environ['ATTIO_TOKEN']}"}
 resp = requests.get("https://glacier-api.avax.network/v1/chains")
 resp.raise_for_status()
 payload = resp.json()
-nets    = payload["items"]
+nets = payload.get("items") or payload.get("data") or []
 
 # 3) loop over nets
 for n in nets:
