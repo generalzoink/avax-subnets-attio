@@ -18,11 +18,11 @@ print(f"Found {len(nets)} chains, syncing into Attio…")
 for n in nets:
     # Build the record values mapping
     values = {
-        "external_id": str(n["chainId"]),
-        "name":        n.get("chainName"),
-        "chain_id_6":    n.get("chainId"),
-        "rpc":         n.get("rpcUrl"),
-        "status":      "Mainnet" if n.get("isMainnet") else "Testnet",
+        "external_id": str(n["chainId"]),  # Add this or use an existing field
+        "name": n.get("chainName"),
+        "chain_id_6": n.get("chainId"),
+        "rpc": n.get("rpcUrl"),
+        "status": "Mainnet" if n.get("isMainnet") else "Testnet",
     }
 
     # 1) Upsert record (match on external_id), payload under data.values
