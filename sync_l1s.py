@@ -16,30 +16,27 @@ nets = payload.get("chains", [])
 print(f"Found {len(nets)} chains, syncing into Attio…")
 
 for n in nets:
-    # Build the upsert payload data
-    body_data = {
+    # Build the record values mapping
+    values = {
         "external_id": str(n["chainId"]),
         "name":        n.get("chainName"),
-        "attributes": {
-            "Chain ID": n.get("chainId"),
-            "RPC":      n.get("rpcUrl"),
-            "Status":   "Mainnet" if n.get("isMainnet") else "Testnet",
-        }
+        "Chain ID":    n.get("chainId"),
+        "RPC":         n.get("rpcUrl"),
+        "Status":      "Mainnet" if n.get("isMainnet") else "Testnet",
     }
 
-    # 1) Upsert record (match on external_id), wrapping payload under 'data'
+    # 1) Upsert record (match on external_id), payload under data.values
     put = requests.put(
         f"{ATTIO_BASE}/objects/{os.environ['ATTIO_OBJ']}/records",
         params={"matching_attribute": "external_id"},
-        json={"data": body_data},
+        json={"data": {"values": values}},
         headers=HEADERS
     )
-    print("→ PUT", body_data["external_id"], "status:", put.status_code, put.text)
+    print("→ PUT", values["external_id"], "status:", put.status_code, put.text)
     put.raise_for_status()
-    # Response JSON wraps record_id under 'data'
     record_id = put.json()["data"]["record_id"]
 
-    # 2) Add the record to your list (also wrapped under 'data')
+    # 2) Add the record to your list
     post = requests.post(
         f"{ATTIO_BASE}/lists/{os.environ['ATTIO_LIST_ID']}/entries",
         json={"data": {"record_id": record_id}},
