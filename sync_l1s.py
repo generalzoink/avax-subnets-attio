@@ -30,7 +30,7 @@ for c in chains:
     try:
         requests.post(
             f"{ATTIO_BASE}/lists/{os.environ['ATTIO_LIST_ID']}/entries",
-            json={"data": {"chain_id": record_id}},
+            json={"data": {"chain_id": "chainId"}},
             headers=HEADERS,
         ).raise_for_status()
         print("  ↳ added to list")
