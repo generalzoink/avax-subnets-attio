@@ -1,7 +1,7 @@
 name: Sync Avalanche L1s
 on:
   schedule:
-    - cron: '0 2 * * *'      # daily
+    cron: '0 2 * * *'  # daily
   workflow_dispatch:
 
 jobs:
@@ -10,14 +10,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install requests
-        run: python -m pip install --upgrade pip requests
-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+      
       - name: Run script
         run: python sync_l1s.py
+        env:
+          ATTIO_TOKEN: ${{ secrets.ATTIO_TOKEN }}
+          ATTIO_OBJ: ${{ secrets.ATTIO_OBJ }}
+          ATTIO_LIST_ID: ${{ secrets.ATTIO_LIST_ID }}
