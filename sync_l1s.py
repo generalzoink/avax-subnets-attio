@@ -1,72 +1,41 @@
-#!/usr/bin/env python3
-"""
-Sync Avalanche L1 chains → custom Attio object “Blockchains”
-• Unique key: chain_id  (slug: chain_id)
-• Extra fields: name, status, rpc
-• Robust to missing IDs in the response
-"""
-
-import os, sys, time, requests
+import os, time, requests
 
 ATTIO_BASE = "https://api.attio.com/v2"
-HEADERS    = {"Authorization": f"Bearer {os.getenv('ATTIO_TOKEN')}"}
+HEADERS     = {"Authorization": f"Bearer {os.environ['ATTIO_TOKEN']}"}
 
-def status_from_payload(c: dict) -> str:
-    return "Mainnet" if c.get("isMainnet", not c.get("isTestnet", False)) else "Testnet"
+# ------------------------------------------------------------------
+# 1. Pull every chain from Glacier
+chains = requests.get("https://glacier-api.avax.network/v1/chains").json().get("chains", [])
+print(f"Found {len(chains)} chains, syncing into Attio…")
 
-def main() -> None:
+for c in chains:
+    values = {
+        "chain_id": str(c["chainId"]),                    # unique key we’ll match on
+        "name"        : c.get("chainName"),
+        "rpc"         : c.get("rpcUrl"),
+        "status"      : "Mainnet" if c.get("isMainnet") else "Testnet",
+    }
+
+    # ------------------------------------------------------------------
+    # 2. Upsert the Company record (match on external_id)
+    put = requests.put(
+        f"{ATTIO_BASE}/objects/{os.environ['ATTIO_OBJ']}/records",
+        params={"matching_attribute": "chain_id"},
+        json = {"data": {"values": values}},
+        headers = HEADERS,
+    )
+    # ------------------------------------------------------------------
+    # 3. Add / ensure the record is on your list
+    #    (If you re-run the script this won’t error)
     try:
-        chains = requests.get("https://glacier-api.avax.network/v1/chains")
-        chains.raise_for_status()
-        chains = chains.json().get("chains", [])
-    except Exception as exc:
-        print("🔥  Could not fetch Glacier chains:", exc, file=sys.stderr)
-        sys.exit(1)
+        requests.post(
+            f"{ATTIO_BASE}/lists/{os.environ['ATTIO_LIST_ID']}/entries",
+            json={"data": {"chain_id": record_id}},
+            headers=HEADERS,
+        ).raise_for_status()
+        print("  ↳ added to list")
+    except requests.HTTPError as e:
+        if e.response.status_code != 409:     # 409 = already in list
+            raise
 
-    print(f"Found {len(chains)} chains – syncing to Attio")
-
-    for c in chains:
-        chain_id = c.get("chainId")
-        if chain_id is None:
-            print(f"⏭  Skipping (no chainId)  {c.get('chainName')}")
-            continue
-
-        values = {
-            "chain_id": chain_id,
-            "name":     c.get("chainName"),
-            "status":   status_from_payload(c),
-            "rpc":      c.get("rpcUrl"),
-        }
-
-        try:
-            put = requests.put(
-                f"{ATTIO_BASE}/objects/{os.getenv('ATTIO_OBJ')}/records",
-                params={"matching_attribute": "chain_id"},
-                json={"data": {"values": values}},
-                headers=HEADERS,
-            )
-            put.raise_for_status()
-            body = put.json().get("data", {})
-            record_id = body.get("record_id") or body.get("id")  # ← handle both shapes
-
-            if record_id:
-                print(f"✓  Upserted chain_id {chain_id} → record {record_id}")
-                try:
-                    requests.post(
-                        f"{ATTIO_BASE}/lists/{os.getenv('ATTIO_LIST_ID')}/entries",
-                        json={"data": {"record_id": record_id}},
-                        headers=HEADERS,
-                    ).raise_for_status()
-                except requests.HTTPError as e:
-                    if e.response.status_code != 409:  # ignore “already in list”
-                        raise
-            else:
-                print(f"⚠️  Upserted chain_id {chain_id} but no record ID returned – not added to list")
-
-        except Exception as exc:
-            print(f"⚠️  Failed to upsert chain_id {chain_id}: {exc}", file=sys.stderr)
-
-        time.sleep(0.2)
-
-if __name__ == "__main__":
-    main()
+    time.sleep(0.2)  # rate-limit
