@@ -13,7 +13,7 @@ for n in nets:
         "Status": "Mainnet" if n["isMainnet"] else "Testnet"
       }
     }
-    rec = requests.put(f"{ATTIO}/objects/{os.environ['companies']}/records",
+    rec = requests.put(f"{ATTIO}/objects/{os.environ['7e12c8ee-3585-416f-be09-7612a7dca560']}/records",
                        json=body, headers=HEAD).json()["record_id"]
     requests.post(f"{ATTIO}/lists/{os.environ['9a23136a-5390-4c8f-b7f7-4cd3f9267a00']}/entries",
                   json={"record_id": rec}, headers=HEAD)
