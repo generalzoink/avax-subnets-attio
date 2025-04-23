@@ -20,7 +20,7 @@ for n in nets:
     values = {
         "external_id": str(n["chainId"]),
         "name":        n.get("chainName"),
-        "Chain ID":    n.get("chainId"),
+        "Chain_ID":    n.get("chainId"),
         "RPC":         n.get("rpcUrl"),
         "Status":      "Mainnet" if n.get("isMainnet") else "Testnet",
     }
