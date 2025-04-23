@@ -1,36 +1,24 @@
 #!/usr/bin/env python3
 """
-Sync Avalanche L1 chains → Attio Companies
-• Unique key: domains (from officialSite)
-• Extra fields: chain_id_6, rpc, status
-• Chains with no officialSite are skipped without failing the workflow
+Sync Avalanche L1 chains → custom Attio object “Blockchains”
+• Unique key: chain_id  (slug: chain_id)   ← mark this attribute “Unique across object” in Attio
+• Extra fields: name, status, rpc
 """
 
 import os
 import sys
 import time
 import requests
-from urllib.parse import urlparse
 
 ATTIO_BASE = "https://api.attio.com/v2"
 HEADERS    = {"Authorization": f"Bearer {os.getenv('ATTIO_TOKEN')}"}
 
-SKIPPED = 0
 UPSERTED = 0
+SKIPPED  = 0
 
 # ---------------------------------------------------------------------------
-def root_domain(url: str | None) -> str | None:
-    """Return bare domain or None."""
-    if not url:
-        return None
-    # prepend scheme if missing so urlparse behaves
-    parsed = urlparse(url if url.startswith(("http://", "https://")) else f"https://{url}")
-    host = parsed.netloc.lower()
-    return host[4:] if host.startswith("www.") else host or None
-
-
 def status_from_payload(chain: dict) -> str:
-    """Mainnet/Testnet logic."""
+    """Return 'Mainnet' or 'Testnet'."""
     if "isMainnet" in chain:
         return "Mainnet" if chain["isMainnet"] else "Testnet"
     return "Testnet" if chain.get("isTestnet") else "Mainnet"
@@ -38,49 +26,48 @@ def status_from_payload(chain: dict) -> str:
 
 # ---------------------------------------------------------------------------
 def main() -> None:
-    global SKIPPED, UPSERTED
+    global UPSERTED, SKIPPED
 
-    # 1. Download chain list
+    # 1. Fetch every chain from Glacier
     try:
-        chains = requests.get("https://glacier-api.avax.network/v1/chains")
-        chains.raise_for_status()
-        chains = chains.json().get("chains", [])
+        resp = requests.get("https://glacier-api.avax.network/v1/chains")
+        resp.raise_for_status()
+        chains = resp.json().get("chains", [])
     except Exception as exc:
         print("🔥  Could not fetch Glacier chains:", exc, file=sys.stderr)
         sys.exit(1)
 
     print(f"Found {len(chains)} chains – syncing to Attio")
 
-    # 2. Process each chain
+    # 2. Upsert each chain
     for c in chains:
-        domain = root_domain(c.get("officialSite"))
-        if not domain:
+        chain_id = c.get("chainId")
+        if chain_id is None:
             SKIPPED += 1
-            print(f"⏭  {c.get('chainName','(no name)')} – skipped (no domain)")
-            continue   # skip, do NOT fail
+            print(f"⏭  {c.get('chainName','(no name)')} – skipped (no chainId)")
+            continue
 
         values = {
-            "domains":    [domain],
-            "name":       c.get("chainName"),
-            "chain_id_6": c.get("chainId"),
-            "rpc":        c.get("rpcUrl"),
-            "status":     status_from_payload(c),
+            "chain_id": chain_id,              # ← unique slug
+            "name":     c.get("chainName"),
+            "status":   status_from_payload(c),
+            "rpc":      c.get("rpcUrl"),
         }
 
         try:
-            # 2a. Upsert company via domains
+            # 2a. Upsert using chain_id as the matching attribute
             put = requests.put(
                 f"{ATTIO_BASE}/objects/{os.getenv('ATTIO_OBJ')}/records",
-                params={"matching_attribute": "domains"},
+                params={"matching_attribute": "chain_id"},
                 json={"data": {"values": values}},
                 headers=HEADERS,
             )
             put.raise_for_status()
             record_id = put.json()["data"]["record_id"]
             UPSERTED += 1
-            print(f"✓  Upserted {domain}  → record {record_id}")
+            print(f"✓  Upserted chain_id {chain_id}  → record {record_id}")
 
-            # 2b. Ensure record is on list
+            # 2b. Ensure it sits on the “Avalanche L1s” list
             try:
                 requests.post(
                     f"{ATTIO_BASE}/lists/{os.getenv('ATTIO_LIST_ID')}/entries",
@@ -88,17 +75,16 @@ def main() -> None:
                     headers=HEADERS,
                 ).raise_for_status()
             except requests.HTTPError as e:
-                if e.response.status_code != 409:  # ignore duplicate entry
+                if e.response.status_code != 409:      # 409 = already on list
                     raise
 
         except Exception as exc:
-            # Log the problem but keep looping so workflow finishes
-            print(f"⚠️  Failed to upsert {domain}: {exc}", file=sys.stderr)
+            # Log but carry on so workflow doesn’t fail on a single bad record
+            print(f"⚠️  Failed to upsert chain_id {chain_id}: {exc}", file=sys.stderr)
 
-        time.sleep(0.2)   # polite rate-limit
+        time.sleep(0.2)   # respectful rate-limit
 
-    # -----------------------------------------------------------------------
-    print(f"\nDone. Upserted {UPSERTED} chains, skipped {SKIPPED} (no domain).")
+    print(f"\nDone. Upserted {UPSERTED} chains, skipped {SKIPPED} (no chainId).")
 
 
 if __name__ == "__main__":
