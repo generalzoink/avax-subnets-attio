@@ -26,7 +26,7 @@ jobs:
       # 4) actually run your script
       - name: Run sync script
         env:
-          ATTIO_TOKEN:   ${{ secrets.ATTIO_TOKEN }}
-          ATTIO_OBJ:     ${{ secrets.ATTIO_OBJ }}
-          ATTIO_LIST_ID: ${{ secrets.ATTIO_LIST_ID }}
+          ATTIO_TOKEN:   ${{ secrets.940191a34faae94b961302f41ab965989573bc613fff7a609834441467babd80 }}
+          ATTIO_OBJ:     ${{ secrets.companies }}
+          ATTIO_LIST_ID: ${{ secrets.9a23136a-5390-4c8f-b7f7-4cd3f9267a00 }}
         run: python sync_l1s.py
