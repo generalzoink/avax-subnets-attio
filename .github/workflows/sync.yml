@@ -1,0 +1,32 @@
+name: Sync Avalanche L1s
+
+on:
+  workflow_dispatch:
+  schedule:
+    # every day at 02:00 UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # 1) grab your code
+      - uses: actions/checkout@v4
+
+      # 2) install Python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3) install requests into _that_ same python
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip requests
+
+      # 4) actually run your script
+      - name: Run sync script
+        env:
+          ATTIO_TOKEN:   ${{ secrets.ATTIO_TOKEN }}
+          ATTIO_OBJ:     ${{ secrets.ATTIO_OBJ }}
+          ATTIO_LIST_ID: ${{ secrets.ATTIO_LIST_ID }}
+        run: python sync_l1s.py
