@@ -15,7 +15,7 @@ print(f"Found {len(nets)} chains, syncing into Attio…")
 
 for n in nets:
     body = {
-      "external_id": n.get("slug") or n.get("id"),
+      "external_id": n["chainId"],
       "name":        n.get("name"),
       "attributes": {
         "Chain ID": n.get("chainId"),
