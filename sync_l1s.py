@@ -1,6 +1,6 @@
 import os, requests, time
 ATTIO = "https://api.attio.com/v2"
-HEAD  = {"Authorization": f"Bearer {os.environ['940191a34faae94b961302f41ab965989573bc613fff7a609834441467babd80']}"}
+HEAD  = {"Authorization": f"Bearer {os.environ['ATTIO_TOKEN']}"}
 
 nets = requests.get("https://glacier-api.avax.network/v1/networks").json()["items"]
 for n in nets:
@@ -13,8 +13,8 @@ for n in nets:
         "Status": "Mainnet" if n["isMainnet"] else "Testnet"
       }
     }
-    rec = requests.put(f"{ATTIO}/objects/{os.environ['7e12c8ee-3585-416f-be09-7612a7dca560']}/records",
+    rec = requests.put(f"{ATTIO}/objects/{os.environ['ATTIO_OBJ']}/records",
                        json=body, headers=HEAD).json()["record_id"]
-    requests.post(f"{ATTIO}/lists/{os.environ['9a23136a-5390-4c8f-b7f7-4cd3f9267a00']}/entries",
+    requests.post(f"{ATTIO}/lists/{os.environ['ATTIO_LIST_ID']}/entries",
                   json={"record_id": rec}, headers=HEAD)
     time.sleep(0.2)
