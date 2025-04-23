@@ -1,4 +1,7 @@
-import os, requests, time
+import os
+import time
+import requests
+import json
 
 ATTIO = "https://api.attio.com/v2"
 HEAD  = {"Authorization": f"Bearer {os.environ['ATTIO_TOKEN']}"}
