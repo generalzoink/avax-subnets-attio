@@ -21,7 +21,7 @@ jobs:
       # 3) install requests into _that_ same python
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip requests
+          python -m pip install --upgrade pip aiohttp
 
       # 4) actually run your script
       - name: Run sync script
