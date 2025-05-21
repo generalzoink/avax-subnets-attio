@@ -11,6 +11,19 @@ CONCURRENCY_LIMIT = 20  # Adjust depending on API rate limits
 
 sem = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
+async def list_entry_exists(session, record_id):
+    """Return True if the record is already in the Attio list."""
+    async with session.get(
+        f"{ATTIO_BASE}/lists/{ATTIO_LIST_ID}/entries",
+        params={"parent_record_id": record_id},
+        headers=HEADERS,
+    ) as resp:
+        if resp.status != 200:
+            return False
+        data = await resp.json()
+        entries = data.get("data", [])
+        return any(e.get("parent_record_id") == record_id for e in entries)
+
 async def fetch_chains():
     async with aiohttp.ClientSession() as session:
         async with session.get(GLACIER_URL) as resp:
@@ -59,30 +72,35 @@ async def upsert_and_add_to_list(session, chain):
                         print(chain)
                         return
 
-                # Add to list
-                async with session.post(
-                    f"{ATTIO_BASE}/lists/{ATTIO_LIST_ID}/entries",
-                    json={
-                        "data": {
-                            "parent_record_id": parent_record_id,
-                            "parent_object": ATTIO_OBJ,
-                            "entry_values": {},
-                        }
-                    },
-                    headers=HEADERS,
-                ) as post_resp:
-                    if post_resp.status == 429:
-                        wait = 2 ** attempt
-                        print(f"⚠️ Rate limited on list entry for {chain['chainName']}, retrying in {wait}s…")
-                        await asyncio.sleep(wait)
-                        continue
-                    elif post_resp.status == 409:
-                        print(f"↳ already in list: {chain['chainName']}")
-                    elif post_resp.status in [200, 201]:
-                        print(f"✅ added to list: {chain['chainName']}")
-                    else:
-                        text = await post_resp.text()
-                        print(f"❌ Error adding {chain['chainName']}: {post_resp.status} - {text}")
+                # Add to list only if it does not already exist
+                already_in_list = await list_entry_exists(session, parent_record_id)
+
+                if already_in_list:
+                    print(f"↳ already in list: {chain['chainName']}")
+                else:
+                    async with session.post(
+                        f"{ATTIO_BASE}/lists/{ATTIO_LIST_ID}/entries",
+                        json={
+                            "data": {
+                                "parent_record_id": parent_record_id,
+                                "parent_object": ATTIO_OBJ,
+                                "entry_values": {},
+                            }
+                        },
+                        headers=HEADERS,
+                    ) as post_resp:
+                        if post_resp.status == 429:
+                            wait = 2 ** attempt
+                            print(f"⚠️ Rate limited on list entry for {chain['chainName']}, retrying in {wait}s…")
+                            await asyncio.sleep(wait)
+                            continue
+                        elif post_resp.status == 409:
+                            print(f"↳ already in list: {chain['chainName']}")
+                        elif post_resp.status in [200, 201]:
+                            print(f"✅ added to list: {chain['chainName']}")
+                        else:
+                            text = await post_resp.text()
+                            print(f"❌ Error adding {chain['chainName']}: {post_resp.status} - {text}")
                 break  # Exit retry loop if all went well
             except Exception as e:
                 print(f"❌ Unexpected error for {chain['chainName']}: {e}")
