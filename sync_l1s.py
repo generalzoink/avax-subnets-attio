@@ -17,7 +17,33 @@ async def fetch_chains():
             data = await resp.json()
             return data.get("chains", [])
 
-async def upsert_and_add_to_list(session, chain):
+async def fetch_existing_ids(session):
+    """Fetch existing list entry parent_record_ids."""
+    existing = set()
+    page = 1
+    while True:
+        async with session.get(
+            f"{ATTIO_BASE}/lists/{ATTIO_LIST_ID}/entries",
+            params={"page": page},
+            headers=HEADERS,
+        ) as resp:
+            if resp.status != 200:
+                print(f"❌ Error fetching existing entries: {resp.status}")
+                break
+            data = await resp.json()
+            for entry in data.get("data", []):
+                pid = entry.get("parent_record_id")
+                if pid:
+                    existing.add(pid)
+            meta = data.get("meta", {})
+            if meta.get("next_page"):
+                page = meta["next_page"]
+            else:
+                break
+    return existing
+
+
+async def upsert_and_add_to_list(session, chain, existing_ids):
     async with sem:
         for attempt in range(5):  # max 5 retries
             try:
@@ -59,6 +85,10 @@ async def upsert_and_add_to_list(session, chain):
                         print(chain)
                         return
 
+                if parent_record_id in existing_ids:
+                    print(f"↳ already synced: {chain_name}")
+                    break
+
                 # Add to list
                 async with session.post(
                     f"{ATTIO_BASE}/lists/{ATTIO_LIST_ID}/entries",
@@ -73,16 +103,22 @@ async def upsert_and_add_to_list(session, chain):
                 ) as post_resp:
                     if post_resp.status == 429:
                         wait = 2 ** attempt
-                        print(f"⚠️ Rate limited on list entry for {chain['chainName']}, retrying in {wait}s…")
+                        print(
+                            f"⚠️ Rate limited on list entry for {chain['chainName']}, retrying in {wait}s…"
+                        )
                         await asyncio.sleep(wait)
                         continue
-                    elif post_resp.status == 409:
-                        print(f"↳ already in list: {chain['chainName']}")
-                    elif post_resp.status in [200, 201]:
-                        print(f"✅ added to list: {chain['chainName']}")
+                    elif post_resp.status in [200, 201, 409]:
+                        if post_resp.status == 409:
+                            print(f"↳ already in list: {chain['chainName']}")
+                        else:
+                            print(f"✅ added to list: {chain['chainName']}")
+                        existing_ids.add(parent_record_id)
                     else:
                         text = await post_resp.text()
-                        print(f"❌ Error adding {chain['chainName']}: {post_resp.status} - {text}")
+                        print(
+                            f"❌ Error adding {chain['chainName']}: {post_resp.status} - {text}"
+                        )
                 break  # Exit retry loop if all went well
             except Exception as e:
                 print(f"❌ Unexpected error for {chain['chainName']}: {e}")
@@ -93,7 +129,8 @@ async def main():
     print(f"Found {len(chains)} chains, syncing into Attio…")
 
     async with aiohttp.ClientSession() as session:
-        tasks = [upsert_and_add_to_list(session, c) for c in chains]
+        existing_ids = await fetch_existing_ids(session)
+        tasks = [upsert_and_add_to_list(session, c, existing_ids) for c in chains]
         await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
