@@ -90,10 +90,15 @@ async def upsert_and_add_to_list(session, chain):
 
 async def main():
     chains = await fetch_chains()
-    print(f"Found {len(chains)} chains, syncing into Attio…")
+
+    # Deduplicate chains by chainId to avoid processing duplicates
+    unique_chains_dict = {c.get("chainId"): c for c in chains}
+    unique_chains = list(unique_chains_dict.values())
+
+    print(f"Found {len(unique_chains)} unique chains, syncing into Attio…")
 
     async with aiohttp.ClientSession() as session:
-        tasks = [upsert_and_add_to_list(session, c) for c in chains]
+        tasks = [upsert_and_add_to_list(session, c) for c in unique_chains]
         await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
