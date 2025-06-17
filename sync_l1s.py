@@ -38,7 +38,7 @@ async def assert_list_entry(session: aiohttp.ClientSession, parent_record_id: st
                     await dedupe_list_entries(session, parent_record_id)
                     continue                    # retry once after cleanup
             text = await resp.text()
-            print(f"❌ List‑assert failed: {resp.status} – {text}")
+            raise RuntimeError(f"List‑assert failed ({resp.status}): {text}")
             return
 
 async def dedupe_list_entries(session, parent_record_id):
@@ -107,4 +107,4 @@ async def upsert_and_add_to_list(session, chain):
 
             except Exception as e:
                 print(f"❌ Unexpected error for {chain.get('chainName')}: {e}")
-                break
+                raise 
